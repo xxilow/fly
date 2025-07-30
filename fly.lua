@@ -13,13 +13,14 @@ local speed = 100
 local direction = Vector3.zero
 local bodyGyro
 local bodyVelocity
+local renderConn
 
 -- Create UI
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "FlyMenuUI"
 screenGui.ResetOnSpawn = false
 
--- Menu Frame (rounded)
+-- Menu Frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 220, 0, 140)
 frame.Position = UDim2.new(0, 20, 0, 20)
@@ -34,19 +35,18 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = frame
 
--- Instruction Label (centered, not italic, disappears after 10s)
+-- Instruction Label
 local instruction = Instance.new("TextLabel", screenGui)
-instruction.Size = UDim2.new(0, 700, 0, 60) -- un peu plus grand
+instruction.Size = UDim2.new(0, 700, 0, 60)
 instruction.AnchorPoint = Vector2.new(0.5, 0.5)
 instruction.Position = UDim2.new(0.5, 0, 0.5, 0)
 instruction.BackgroundTransparency = 1
 instruction.Text = "[INSERT] pour ouvrir/fermer le menu"
-instruction.TextColor3 = Color3.new(255, 255, 255) -- couleur noire
+instruction.TextColor3 = Color3.new(255, 255, 255)
 instruction.Font = Enum.Font.SourceSansBold
-instruction.TextSize = 40 -- plus grand
-instruction.TextStrokeTransparency = 1 -- léger contour pour la visibilité
+instruction.TextSize = 40
+instruction.TextStrokeTransparency = 1
 instruction.TextWrapped = true
-
 
 task.delay(10, function()
 	if instruction then
@@ -68,7 +68,7 @@ local flyCorner = Instance.new("UICorner")
 flyCorner.CornerRadius = UDim.new(0, 8)
 flyCorner.Parent = flyButton
 
--- Speed Slider label
+-- Speed Label
 local speedLabel = Instance.new("TextLabel", frame)
 speedLabel.Size = UDim2.new(1, -20, 0, 20)
 speedLabel.Position = UDim2.new(0, 10, 0, 60)
@@ -99,19 +99,32 @@ local knobCorner = Instance.new("UICorner")
 knobCorner.CornerRadius = UDim.new(0, 4)
 knobCorner.Parent = sliderKnob
 
--- Functions
+-- Update slider UI
 local function updateSpeedSlider()
 	speedLabel.Text = "Speed: " .. math.floor(speed)
 	sliderKnob.Position = UDim2.new(speed / 300, 0, 0, 0)
 end
 
+-- Stop fly function
+local function stopFly()
+	flying = false
+	flyButton.Text = "Fly: OFF"
+	flyButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+
+	if bodyGyro then bodyGyro:Destroy() end
+	if bodyVelocity then bodyVelocity:Destroy() end
+	if renderConn then renderConn:Disconnect() end
+end
+
+-- Start fly function
 local function startFly()
 	if flying then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
 	flying = true
 	flyButton.Text = "Fly: ON"
 	flyButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-
-	local hrp = char:WaitForChild("HumanoidRootPart")
 
 	bodyGyro = Instance.new("BodyGyro")
 	bodyGyro.P = 9e4
@@ -124,7 +137,7 @@ local function startFly()
 	bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
 	bodyVelocity.Parent = hrp
 
-	runService.RenderStepped:Connect(function()
+	renderConn = runService.RenderStepped:Connect(function()
 		if not flying then return end
 		local moveDir = Vector3.zero
 
@@ -137,14 +150,7 @@ local function startFly()
 	end)
 end
 
-local function stopFly()
-	flying = false
-	flyButton.Text = "Fly: OFF"
-	flyButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-	if bodyGyro then bodyGyro:Destroy() end
-	if bodyVelocity then bodyVelocity:Destroy() end
-end
-
+-- Toggle fly
 local function toggleFly()
 	if flying then
 		stopFly()
@@ -156,7 +162,7 @@ end
 -- Button click
 flyButton.MouseButton1Click:Connect(toggleFly)
 
--- Slider drag
+-- Slider drag logic
 local dragging = false
 
 speedSlider.InputBegan:Connect(function(input)
@@ -180,7 +186,7 @@ uis.InputChanged:Connect(function(input)
 	end
 end)
 
--- Movement keys
+-- Movement key inputs
 uis.InputBegan:Connect(function(input, gpe)
 	if gpe then return end
 
@@ -217,5 +223,15 @@ uis.InputEnded:Connect(function(input)
 	end
 end)
 
--- Init UI
+-- When character respawns
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	stopFly()
+	task.wait(1)
+	if flying then
+		startFly()
+	end
+end)
+
+-- Init slider
 updateSpeedSlider()
